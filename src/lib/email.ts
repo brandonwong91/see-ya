@@ -1,5 +1,11 @@
 import { Resend } from "resend";
-import type { ClaimRequest, DateOption, EventRecord, Invitee } from "./types";
+import type {
+  ClaimRequest,
+  Comment,
+  DateOption,
+  EventRecord,
+  Invitee,
+} from "./types";
 import { buildIcs } from "./ics";
 import { googleCalendarUrl, icsPath } from "./calendar";
 import { formatDateLong, formatTime } from "./format";
@@ -456,6 +462,67 @@ export async function sendClaimResolved(
   await send({
     to: request.email,
     subject: `Update on your request: ${event.title}`,
+    html: shell(inner),
+    text,
+    replyTo: event.organiser.email,
+  });
+}
+
+// ─── Comments ───────────────────────────────────────────────────────────────
+
+function quote(body: string): string {
+  return `<div style="background:${PAPER};border:2px solid ${LINE};border-radius:14px;padding:14px 16px;margin:6px 0 20px;font-family:${SANS};font-size:15px;line-height:1.6;white-space:pre-line">${escapeHtml(body)}</div>`;
+}
+
+/** A guest left a message: the organiser gets every one, private or public.
+ *  Replying to the email goes straight to the guest when we know their email. */
+export async function sendCommentToOrganiser(
+  event: EventRecord,
+  comment: Comment,
+  author: Invitee,
+): Promise<void> {
+  const manage = manageUrl(event);
+  const isPrivate = comment.visibility === "organiser";
+  const inner = `
+    ${h1(isPrivate ? `Message for you: ${event.title}` : `New message: ${event.title}`)}
+    ${p(`<strong>${escapeHtml(comment.authorName)}</strong> ${isPrivate ? "sent you a private message" : "posted to everyone on the plan"}:`)}
+    ${quote(comment.body)}
+    ${p(author.email ? `Reply to this email to answer ${escapeHtml(comment.authorName)} directly.` : `<span style="color:${MUTED}">${escapeHtml(comment.authorName)} hasn't left an email, so reply from your dashboard.</span>`)}
+    ${btn(manage, "Open organiser dashboard")}
+  `;
+  const text = `${isPrivate ? "Message for you" : "New message"}: ${event.title}\n\n${comment.authorName}${isPrivate ? " (private)" : ""}:\n\n${comment.body}\n\nDashboard: ${manage}`;
+  await send({
+    to: event.organiser.email,
+    subject: isPrivate
+      ? `${comment.authorName} messaged you — ${event.title}`
+      : `${comment.authorName} posted — ${event.title}`,
+    html: shell(inner),
+    text,
+    replyTo: author.email || undefined,
+  });
+}
+
+/** A public message, sent to a guest who didn't write it. */
+export async function sendCommentToGuest(
+  event: EventRecord,
+  comment: Comment,
+  recipient: Invitee,
+): Promise<void> {
+  const link = `${publicUrl(event)}?e=${recipient.id}#messages`;
+  const who = comment.authorId === null
+    ? `${comment.authorName} (organiser)`
+    : comment.authorName;
+  const inner = `
+    ${h1(`New message: ${event.title}`)}
+    ${p(`<strong>${escapeHtml(who)}</strong> posted to everyone on the plan:`)}
+    ${quote(comment.body)}
+    ${btn(link, "Reply on the plan")}
+    ${p(`<span style="color:${MUTED}">Replying to this email reaches the organiser only.</span>`)}
+  `;
+  const text = `New message: ${event.title}\n\n${who}:\n\n${comment.body}\n\nReply on the plan: ${link}\n(Replying to this email reaches the organiser only.)`;
+  await send({
+    to: recipient.email,
+    subject: `${comment.authorName} posted — ${event.title}`,
     html: shell(inner),
     text,
     replyTo: event.organiser.email,

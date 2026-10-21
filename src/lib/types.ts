@@ -66,6 +66,34 @@ export interface Seat {
   status: SeatStatus;
 }
 
+export type CommentVisibility = "public" | "organiser";
+
+/** A message left on the plan. Guests post once they've claimed a name or
+ *  opened their personal link; the organiser posts from the dashboard. */
+export interface Comment {
+  id: string;
+  /** Invitee id of the guest who wrote it; null when the organiser did. Never
+   *  sent to public views — it doubles as the guest's personal link. */
+  authorId: string | null;
+  authorName: string;
+  body: string;
+  /** `organiser` messages are only seen by the organiser and their author. */
+  visibility: CommentVisibility;
+  createdAt: string;
+}
+
+/** A comment as a guest sees it. */
+export interface PublicComment {
+  id: string;
+  authorName: string;
+  body: string;
+  visibility: CommentVisibility;
+  fromOrganiser: boolean;
+  /** True when the viewer wrote it. */
+  mine: boolean;
+  createdAt: string;
+}
+
 export interface ChangeLogEntry {
   at: string;
   version: number;
@@ -98,6 +126,7 @@ export interface EventRecord {
   invitees: Invitee[];
   changeLog: ChangeLogEntry[];
   claimRequests?: ClaimRequest[];
+  comments?: Comment[];
 }
 
 /** Shape returned to public (RSVP) clients — secrets and PII stripped. */

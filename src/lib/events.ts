@@ -5,11 +5,13 @@ import { newEditToken, newEventId, newSubId } from "./ids";
 import { formatDateLong, formatDateShort, formatTime } from "./format";
 import type {
   ClaimRequest,
+  Comment,
   DateOption,
   EventRecord,
   Invitee,
   ManageEvent,
   Person,
+  PublicComment,
   PublicEvent,
   Seat,
   SeatStatus,
@@ -17,6 +19,7 @@ import type {
 } from "./types";
 import type {
   ClaimRequestInput,
+  CommentInput,
   CreateEventInput,
   InviteInput,
   PatchEventInput,
@@ -439,6 +442,63 @@ export function resolveClaimRequest(
     fields: [],
   });
   return { request, invitee, alsoDeclined };
+}
+
+// ─── Comments ───────────────────────────────────────────────────────────────
+
+/** Each comment emails people, so keep a guest from flooding inboxes. */
+const COMMENT_GAP_MS = 15 * 1000;
+const MAX_COMMENTS = 500;
+
+/** Adds a comment from `author` (a guest), or from the organiser when null.
+ *  Organiser posts are always public. */
+export function addComment(
+  event: EventRecord,
+  author: Invitee | null,
+  input: CommentInput,
+): Comment {
+  const comments = (event.comments ??= []);
+  if (comments.length >= MAX_COMMENTS) {
+    throw new PantryError("This plan has reached its message limit", 429);
+  }
+  const authorId = author?.id ?? null;
+  const last = comments.findLast((c) => c.authorId === authorId);
+  if (last && Date.now() - Date.parse(last.createdAt) < COMMENT_GAP_MS) {
+    throw new PantryError("You're posting quickly — give it a few seconds", 429);
+  }
+  const now = new Date().toISOString();
+  if (author) author.claimedAt ??= now;
+  const comment: Comment = {
+    id: newSubId(),
+    authorId,
+    authorName: author?.name ?? event.organiser.name,
+    body: input.body,
+    visibility: author ? input.visibility : "public",
+    createdAt: now,
+  };
+  comments.push(comment);
+  return comment;
+}
+
+/** Comments a guest may see: every public one, plus their own private ones. */
+export function visibleComments(
+  event: EventRecord,
+  viewerId: string | null,
+): PublicComment[] {
+  return (event.comments ?? [])
+    .filter(
+      (c) =>
+        c.visibility === "public" || (viewerId && c.authorId === viewerId),
+    )
+    .map((c) => ({
+      id: c.id,
+      authorName: c.authorName,
+      body: c.body,
+      visibility: c.visibility,
+      fromOrganiser: c.authorId === null,
+      mine: Boolean(viewerId) && c.authorId === viewerId,
+      createdAt: c.createdAt,
+    }));
 }
 
 export function finalize(
