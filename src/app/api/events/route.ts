@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     sendOrganiserConfirmation(event).catch((e) =>
       console.error("organiser confirmation failed:", e),
     );
-    for (const invitee of event.invitees) {
+    for (const invitee of event.invitees.filter((i) => i.email)) {
       sendInvitation(event, invitee, parsed.data.inviteMessage).catch((e) =>
         console.error("invitation failed:", e),
       );
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
         editToken: event.editToken,
         manageUrl: `/event/${event.id}/manage?token=${event.editToken}`,
         shareUrl: `/event/${event.id}`,
-        invited: event.invitees.length,
+        invited: event.invitees.filter((i) => i.email).length,
       },
       { status: 201 },
     );

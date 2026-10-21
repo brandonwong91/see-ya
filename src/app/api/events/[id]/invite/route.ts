@@ -28,7 +28,7 @@ export async function POST(
 
     let sent = 0;
     await Promise.allSettled(
-      invitees.map(async (invitee) => {
+      invitees.filter((i) => i.email).map(async (invitee) => {
         await sendInvitation(updated, invitee, parsed.data.message);
         invitee.lastNotifiedVersion = updated.version;
         sent += 1;
@@ -36,7 +36,7 @@ export async function POST(
     );
     await saveEvent(updated);
 
-    return ok({ event: toManageEvent(updated), sent });
+    return ok({ event: toManageEvent(updated), added: invitees.length, sent });
   } catch (err) {
     return handleError(err);
   }

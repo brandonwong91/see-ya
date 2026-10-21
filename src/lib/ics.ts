@@ -1,4 +1,5 @@
 import type { EventRecord } from "./types";
+import { calendarLocation, calendarSlot, calendarTitle } from "./calendar";
 
 /** Fold long lines at 75 octets per RFC 5545. */
 function fold(line: string): string {
@@ -25,11 +26,18 @@ function stamp(d: Date): string {
 }
 
 /**
- * Build an .ics for the event. Requires a resolved date — pass the winning
- * DateOption's `date`. If the event has a `time`, we emit a 2-hour timed event
- * in floating local time; otherwise an all-day event.
+ * Build an .ics for the event on `date`. If the event has a `time`, we emit a
+ * 2-hour timed event in floating local time; otherwise an all-day event.
+ *
+ * `tentative` marks a hold for a date that isn't locked in yet. Holds share
+ * the confirmed entry's UID, so importing the confirmation later updates the
+ * hold instead of duplicating it.
  */
-export function buildIcs(event: EventRecord, date: string): string {
+export function buildIcs(
+  event: EventRecord,
+  date: string,
+  { tentative = false }: { tentative?: boolean } = {},
+): string {
   const now = new Date();
   const uid = `${event.id}-${date}@see-ya`;
   const lines: string[] = [
@@ -37,39 +45,34 @@ export function buildIcs(event: EventRecord, date: string): string {
     "VERSION:2.0",
     "PRODID:-//See Ya//EN",
     "CALSCALE:GREGORIAN",
-    "METHOD:REQUEST",
+    tentative ? "METHOD:PUBLISH" : "METHOD:REQUEST",
     "BEGIN:VEVENT",
     `UID:${uid}`,
     `DTSTAMP:${stamp(now)}`,
     `SEQUENCE:${event.version}`,
   ];
 
-  if (event.time) {
-    const [h, m] = event.time.split(":").map(Number);
-    const start = date.replace(/-/g, "") + "T" + pad(h) + pad(m) + "00";
-    const endH = (h + 2) % 24;
-    const end = date.replace(/-/g, "") + "T" + pad(endH) + pad(m) + "00";
-    lines.push(`DTSTART:${start}`, `DTEND:${end}`);
+  const slot = calendarSlot(date, event.time);
+  if (slot.allDay) {
+    lines.push(`DTSTART;VALUE=DATE:${slot.start}`, `DTEND;VALUE=DATE:${slot.end}`);
   } else {
-    const d = date.replace(/-/g, "");
-    const next = stamp(new Date(new Date(date + "T00:00:00Z").getTime() + 86400000)).slice(0, 8);
-    lines.push(`DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${next}`);
+    lines.push(`DTSTART:${slot.start}`, `DTEND:${slot.end}`);
   }
 
-  lines.push(`SUMMARY:${esc(event.title)}`);
+  lines.push(`SUMMARY:${esc(calendarTitle(event.title, tentative))}`);
   if (event.description) lines.push(`DESCRIPTION:${esc(event.description)}`);
   if (event.venue) {
-    lines.push(`LOCATION:${esc(event.venue.name + ", " + event.venue.address)}`);
+    lines.push(`LOCATION:${esc(calendarLocation(event.venue))}`);
     lines.push(`GEO:${event.venue.lat};${event.venue.lng}`);
   }
   lines.push(
     `ORGANIZER;CN=${esc(event.organiser.name)}:mailto:${event.organiser.email}`,
   );
-  lines.push("STATUS:CONFIRMED", "END:VEVENT", "END:VCALENDAR");
+  lines.push(
+    tentative ? "STATUS:TENTATIVE" : "STATUS:CONFIRMED",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  );
 
   return lines.map(fold).join("\r\n");
-}
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
 }

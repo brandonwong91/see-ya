@@ -25,6 +25,7 @@ export interface DateOption {
 export interface Invitee {
   id: string;
   name: string;
+  /** Empty when the organiser only listed a name. */
   email: string;
   /** IDs of the date options this person marked themselves available for. */
   availableDateIds: string[];
@@ -33,6 +34,36 @@ export interface Invitee {
   invitedAt: string | null;
   /** Bumped every time we email this person, so the manage view can show it. */
   lastNotifiedVersion: number;
+  /** Set when a visitor claims this name from the share link. */
+  claimedAt?: string | null;
+  /** Last time we emailed this person their personal link on request. */
+  linkSentAt?: string | null;
+}
+
+export type ClaimRequestStatus = "pending" | "approved" | "declined";
+
+/** Someone asking the organiser for a name that is already claimed. */
+export interface ClaimRequest {
+  id: string;
+  inviteeId: string;
+  /** Name on the guest list they asked for, kept for display after resolving. */
+  seatName: string;
+  name: string;
+  email: string;
+  message: string;
+  status: ClaimRequestStatus;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+/** How a listed name looks from the share link. */
+export type SeatStatus = "open" | "taken" | "emailed";
+
+export interface Seat {
+  /** Public handle for an invitee; never the invitee id itself. */
+  seatId: string;
+  name: string;
+  status: SeatStatus;
 }
 
 export interface ChangeLogEntry {
@@ -66,6 +97,7 @@ export interface EventRecord {
 
   invitees: Invitee[];
   changeLog: ChangeLogEntry[];
+  claimRequests?: ClaimRequest[];
 }
 
 /** Shape returned to public (RSVP) clients — secrets and PII stripped. */
@@ -83,6 +115,8 @@ export interface PublicEvent {
   /** Per option: how many invitees are available. */
   tally: Record<string, number>;
   responseCount: number;
+  /** Names the organiser listed, so visitors can claim theirs. */
+  roster: Seat[];
 }
 
 /** Shape returned to the organiser (manage) view — full detail, minus editToken. */

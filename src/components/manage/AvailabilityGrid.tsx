@@ -68,7 +68,7 @@ export function AvailabilityGrid({
             <tr key={r.id} className="border-b-2 border-line/50">
               <td className="sticky left-0 z-10 bg-surface p-2">
                 <div className="font-bold">{r.name}</div>
-                <div className="text-xs text-muted">{r.email}</div>
+                {r.email && <div className="text-xs text-muted">{r.email}</div>}
                 {r.note && (
                   <div className="mt-0.5 max-w-[200px] text-xs italic text-faint">
                     &ldquo;{r.note}&rdquo;

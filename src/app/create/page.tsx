@@ -10,7 +10,7 @@ import {
   ContactListEditor,
   type ContactRow,
 } from "@/components/ContactListEditor";
-import { createEventSchema, personSchema } from "@/lib/validation";
+import { createEventSchema, guestSchema, personSchema } from "@/lib/validation";
 import { formatDateLong, formatTime } from "@/lib/format";
 import type { Venue } from "@/lib/types";
 
@@ -33,7 +33,7 @@ const STEPS = [
   {
     label: "People",
     title: "Who’s coming along?",
-    hint: "Send an email invite now, or share your link when you’re ready.",
+    hint: "List your guests (emails optional), or just share your link.",
   },
   {
     label: "Review",
@@ -109,6 +109,7 @@ export default function CreatePage() {
     peopleMode === "email"
       ? inviteRows.filter((row) => row.name.trim() || row.email.trim())
       : [];
+  const emailedCount = invitees.filter((row) => row.email.trim()).length;
 
   function goTo(next: number) {
     if (submissionRef.current) return;
@@ -141,10 +142,10 @@ export default function CreatePage() {
       step === 3 &&
       peopleMode === "email" &&
       (invitees.length === 0 ||
-        invitees.some((person) => !personSchema.safeParse(person).success))
+        invitees.some((person) => !guestSchema.safeParse(person).success))
     ) {
       setError(
-        "Add a name and valid email for each guest, or choose to share a link instead.",
+        "Add a name for each guest (emails are optional), or choose to share a link instead.",
       );
       return false;
     }
@@ -493,8 +494,8 @@ export default function CreatePage() {
                       {peopleMode !== "email" ? (
                         <Choice
                           icon="mail"
-                          title="Invite by email"
-                          hint="Your guests get a link to choose their dates."
+                          title="Add a guest list"
+                          hint="Names are enough. Guests claim theirs from your link; add emails to send invites too."
                           onClick={() => setPeopleMode("email")}
                         />
                       ) : (
@@ -595,15 +596,19 @@ export default function CreatePage() {
                         <ReviewRow label="Guests" onEdit={() => editStep(3)}>
                           <p>
                             {invitees.length
-                              ? `${invitees.length} email invite${invitees.length === 1 ? "" : "s"} will be sent.`
+                              ? `${invitees.length} guest${invitees.length === 1 ? "" : "s"} on the list` +
+                                (emailedCount
+                                  ? ` — ${emailedCount} will get an email invite.`
+                                  : ". They’ll claim their name from your link.")
                               : "You’ll get a link to share wherever you like."}
                           </p>
                           {invitees.length > 0 && (
                             <p className="mt-1 break-words">
                               {invitees
-                                .map(
-                                  (person) =>
-                                    `${person.name} (${person.email})`,
+                                .map((person) =>
+                                  person.email.trim()
+                                    ? `${person.name} (${person.email})`
+                                    : person.name,
                                 )
                                 .join(", ")}
                             </p>

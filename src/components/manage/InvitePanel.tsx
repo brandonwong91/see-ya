@@ -44,7 +44,12 @@ export function InvitePanel({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not send invitations");
-      setResult(`Sent ${data.sent} invitation${data.sent === 1 ? "" : "s"}.`);
+      setResult(
+        `Added ${data.added} to the list` +
+          (data.sent
+            ? `, emailed ${data.sent} invitation${data.sent === 1 ? "" : "s"}.`
+            : ". Share your link so they can claim their names."),
+      );
       setRows([{ name: "", email: "" }]);
       setMessage("");
       onUpdated(data.event);
@@ -60,8 +65,9 @@ export function InvitePanel({
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
-        Invitees get an email with the event details and a link to pick dates.
-        You can also just share the public link — anyone with it can respond.
+        Just names is fine — guests tap their name on your share link to claim
+        it. Add an email and they also get the event details and their own
+        link by email.
       </p>
 
       <ContactListEditor rows={rows} onChange={setRows} />
@@ -106,24 +112,30 @@ export function InvitePanel({
             Sending…
           </>
         ) : (
-          `Send ${valid.length || ""} invitation${valid.length === 1 ? "" : "s"}`
+          `${valid.some((r) => r.email.trim()) ? "Add & email" : "Add"} ${valid.length || ""} guest${valid.length === 1 ? "" : "s"}`
         )}
       </button>
 
       {invited.length > 0 && (
         <div className="border-t border-line pt-4">
-          <p className="eyebrow mb-2">Invited ({invited.length})</p>
+          <p className="eyebrow mb-2">Guest list ({invited.length})</p>
           <ul className="space-y-1 text-sm">
             {invited.map((i) => (
-              <li key={i.id} className="flex justify-between">
-                <span>
+              <li key={i.id} className="flex justify-between gap-3">
+                <span className="min-w-0 break-words">
                   {i.name}{" "}
-                  <span className="text-muted">&lt;{i.email}&gt;</span>
+                  <span className="text-muted">
+                    {i.email ? <>&lt;{i.email}&gt;</> : "· name only"}
+                  </span>
                 </span>
-                <span className="font-mono text-xs text-muted">
+                <span className="shrink-0 font-mono text-xs text-muted">
                   {i.respondedAt
                     ? `responded ${formatDateShort(i.respondedAt.slice(0, 10))}`
-                    : "no reply yet"}
+                    : i.claimedAt
+                      ? "claimed, no reply yet"
+                      : i.email
+                        ? "no reply yet"
+                        : "unclaimed"}
                 </span>
               </li>
             ))}
