@@ -1,0 +1,646 @@
+@import "tailwindcss";
+
+/* ─── Design tokens: soft pastel planning palette ───────────────────────────
+   Exact brand colours requested 2026-09-11:
+   cream background, espresso text, charcoal-brown body copy, peach primary,
+   aqua secondary, lavender marquee, butter highlights. Accent fills are pale,
+   so all interactive accents use dark text for contrast. Token names are
+   historical (coral/grape/sun/etc.) to avoid touching every component.        */
+:root {
+  --cream: #FDF2D9;
+  --surface: #FFF8EA;
+  --ink: #2C2623;
+  --ink-soft: #5C524D;
+  --muted: #5C524D;
+  --faint: #7E716A;
+  --line: #EADFC8;
+  --line-strong: #D8C9AC;
+
+  --coral: #F9C6B4;
+  --coral-ink: #5C524D;
+  --sun: #FDE291;
+  --grape: #D6C7F0;
+  --grape-ink: #5C524D;
+  --mint: #A8DADC;
+  --bubble: #F9C6B4;
+  --sky: #A8DADC;
+
+  --shadow: #D8C9AC;
+  --on-accent: #2C2623;
+  --on-bright: #2C2623;
+
+  /* legacy aliases so older components keep working */
+  --paper: var(--cream);
+  --paper-raised: var(--surface);
+  --accent: var(--coral);
+  --accent-ink: var(--coral-ink);
+  --accent-wash: #FCE2D8;
+  --positive: var(--mint);
+
+  /* motion */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@theme inline {
+  --color-cream: var(--cream);
+  --color-surface: var(--surface);
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
+  --color-positive: var(--positive);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-coral: var(--coral);
+  --color-coral-ink: var(--coral-ink);
+  --color-sun: var(--sun);
+  --color-grape: var(--grape);
+  --color-grape-ink: var(--grape-ink);
+  --color-mint: var(--mint);
+  --color-bubble: var(--bubble);
+  --color-sky: var(--sky);
+  --color-on-accent: var(--on-accent);
+  --color-on-bright: var(--on-bright);
+
+  --font-display: var(--font-bricolage), "Trebuchet MS", system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --cream: #FDF2D9;
+    --surface: #FFF8EA;
+    --ink: #2C2623;
+    --ink-soft: #5C524D;
+    --muted: #5C524D;
+    --faint: #7E716A;
+    --line: #EADFC8;
+    --line-strong: #D8C9AC;
+
+    --coral: #F9C6B4;
+    --coral-ink: #5C524D;
+    --sun: #FDE291;
+    --grape: #D6C7F0;
+    --grape-ink: #5C524D;
+    --mint: #A8DADC;
+    --bubble: #F9C6B4;
+    --sky: #A8DADC;
+
+    --shadow: #D8C9AC;
+    --on-accent: #2C2623;
+    --on-bright: #2C2623;
+
+    --accent-wash: #FCE2D8;
+  }
+}
+
+:root[data-theme="dark"] {
+  --cream: #FDF2D9;
+  --surface: #FFF8EA;
+  --ink: #2C2623;
+  --ink-soft: #5C524D;
+  --muted: #5C524D;
+  --faint: #7E716A;
+  --line: #EADFC8;
+  --line-strong: #D8C9AC;
+
+  --coral: #F9C6B4;
+  --coral-ink: #5C524D;
+  --sun: #FDE291;
+  --grape: #D6C7F0;
+  --grape-ink: #5C524D;
+  --mint: #A8DADC;
+  --bubble: #F9C6B4;
+  --sky: #A8DADC;
+
+  --shadow: #D8C9AC;
+  --on-accent: #2C2623;
+  --on-bright: #2C2623;
+
+  --accent-wash: #FCE2D8;
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+* {
+  border-color: var(--line);
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  font-weight: 450;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--sun);
+  color: var(--on-bright);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.02;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Chunky little label */
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--grape-ink);
+}
+
+/* Sticker-style pill. Box styling only — a .chip may also carry a chip-*
+   variant class for its tint. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  background: var(--sun);
+  color: var(--ink);
+  box-shadow: 2px 2px 0 var(--shadow);
+  transition: transform 0.16s var(--ease-out-quart);
+}
+/* Soft pastel chips: exact requested accent fills with dark readable text. */
+.chip.chip-coral { background: var(--coral); }
+.chip.chip-grape { background: var(--grape); }
+.chip.chip-mint { background: var(--mint); }
+.chip.chip-bubble { background: var(--coral); }
+.chip.chip-sky { background: var(--mint); }
+.chip.chip-sun { background: var(--sun); }
+
+/* Card with a soft tactile offset shadow */
+.card {
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 22px;
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+.card-soft {
+  background: var(--surface);
+  border: 2px solid var(--line-strong);
+  border-radius: 20px;
+}
+
+/* Wavy underline accent — soft peach pink */
+.squiggle {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='12' viewBox='0 0 60 12'%3E%3Cpath d='M0 6c5-8 10 8 15 0s10-8 15 0 10 8 15 0 10-8 15 0' fill='none' stroke='%23F9C6B4' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-position: 0 100%;
+  background-size: auto 0.42em;
+  padding-bottom: 0.22em;
+}
+
+.rule {
+  height: 2px;
+  background: var(--line);
+  width: 100%;
+  border-radius: 999px;
+}
+
+/* ─── Focus ──────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 3px solid var(--grape);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ─── Motion ─────────────────────────────────────────────────────────────── */
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal {
+  opacity: 0;
+}
+.reveal.in {
+  animation: pop 0.62s var(--ease-out-quint) forwards;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translateY(-10px) rotate(var(--r, 0deg));
+  }
+}
+.floaty {
+  animation: float 5s ease-in-out infinite;
+}
+
+/* Logo — waving hand + wordmark settle, on first load and on hover */
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  15% { transform: rotate(16deg); }
+  30% { transform: rotate(-9deg); }
+  45% { transform: rotate(12deg); }
+  60% { transform: rotate(-6deg); }
+  75% { transform: rotate(8deg); }
+}
+.anim-wave {
+  animation: wave 1.6s var(--ease-out-quart) 2;
+  transform-origin: 72% 78%;
+}
+
+@keyframes logo-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.anim-logo-in {
+  animation: logo-in 0.5s var(--ease-out-expo) both;
+}
+
+/* Toggle / selection confirmation (calendar days, checkboxes) */
+@keyframes tick-pop {
+  0% { transform: scale(0.7); }
+  55% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.tick-pop {
+  animation: tick-pop 0.24s var(--ease-out-quart);
+}
+
+/* Flash / toast messages sliding in */
+@keyframes flash-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.flash-in {
+  animation: flash-in 0.34s var(--ease-out-quint);
+}
+
+/* Error nudge */
+@keyframes shake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(3px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+.shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+/* One-shot success flourish for an emoji / badge */
+@keyframes celebrate {
+  0% { opacity: 0; transform: scale(0.6) rotate(-8deg); }
+  60% { opacity: 1; transform: scale(1.12) rotate(4deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.celebrate {
+  animation: celebrate 0.5s var(--ease-out-quart) both;
+  display: inline-block;
+}
+
+/* Small inline spinner for loading buttons */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spin {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: spin 0.65s linear infinite;
+}
+
+/* Landing: the hero plays a tiny story (winner date stamps, guests tick in),
+   and cards lift on hover. All transform/opacity. */
+@keyframes stamp {
+  0% { opacity: 0; transform: scale(1.6) rotate(-10deg); }
+  100% { opacity: 1; transform: none; }
+}
+.hero-stamp { animation: stamp 0.45s var(--ease-out-expo) 0.9s both; }
+.hero-tick { animation: stamp 0.35s var(--ease-out-quart) both; }
+@media (hover: hover) {
+  .lift { transition: transform 0.2s var(--ease-out-quart), box-shadow 0.2s var(--ease-out-quart); }
+  .lift:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--shadow); }
+  .lift .lift-icon { transition: transform 0.25s var(--ease-out-quart); }
+  .lift:hover .lift-icon { transform: rotate(-8deg) scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .reveal, .reveal.in {
+    opacity: 1;
+    animation: none;
+  }
+  .floaty {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* ─── Marquee ────────────────────────────────────────────────────────────── */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  display: inline-flex;
+  gap: 0;
+  animation: marquee 26s linear infinite;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
+/* ─── Form controls ─────────────────────────────────────────────────────── */
+.field {
+  width: 100%;
+  background: var(--surface);
+  border: 2px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.18s var(--ease-out-quart);
+}
+.field:focus {
+  border-color: var(--grape);
+  outline: none;
+  box-shadow: 3px 3px 0 var(--line-strong);
+}
+.field::placeholder {
+  color: var(--faint);
+  font-weight: 450;
+}
+textarea.field {
+  resize: vertical;
+  min-height: 5rem;
+  line-height: 1.55;
+}
+
+/* ─── Buttons ───────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.5rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--coral);
+  color: var(--on-accent);
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--shadow);
+  transition:
+    transform 0.12s var(--ease-out-quart),
+    box-shadow 0.12s var(--ease-out-quart),
+    background 0.15s ease,
+    filter 0.15s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0 var(--shadow);
+    filter: brightness(1.04);
+  }
+}
+.btn:active:not(:disabled) {
+  transform: translate(2px, 2px) scale(0.985);
+  box-shadow: 1px 1px 0 var(--shadow);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: 2px 2px 0 var(--shadow);
+}
+.btn-accent {
+  background: var(--coral);
+  color: var(--on-accent);
+}
+.btn-sun {
+  background: var(--sun);
+  color: var(--on-bright);
+}
+.btn-grape {
+  background: var(--grape);
+  color: var(--on-accent);
+}
+.btn-ghost {
+  background: var(--surface);
+  color: var(--ink);
+}
+.btn-sm {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+  box-shadow: 2px 2px 0 var(--shadow);
+}
+
+/* ─── Leaflet — soften + round, keep the map readable ────────────────────── */
+.leaflet-container {
+  font-family: var(--font-sans) !important;
+  background: var(--cream) !important;
+}
+.leaflet-tile-pane {
+  filter: saturate(0.9) contrast(0.96) sepia(0.12);
+}
+@media (prefers-color-scheme: dark) {
+  .leaflet-tile-pane {
+    filter: invert(0.9) hue-rotate(180deg) saturate(0.75) brightness(0.9);
+  }
+}
+.leaflet-bar a {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  border-color: var(--line-strong) !important;
+}
+.leaflet-bar {
+  border-radius: 12px !important;
+  overflow: hidden;
+  border: 2px solid var(--ink) !important;
+}
+.leaflet-control-attribution {
+  background: color-mix(in srgb, var(--surface) 85%, transparent) !important;
+  color: var(--muted) !important;
+  font-size: 10px !important;
+  border-radius: 8px 0 0 0;
+}
+.leaflet-control-attribution a {
+  color: var(--grape-ink) !important;
+}
+
+/* Creation flow: motion follows progress, with no animation dependency.
+   Timing reference: https://animations.dev/learn/animation-theory/the-easing-blueprint */
+.create-flow .field {
+  font-size: 1rem; /* Keeps iOS from zooming the form on focus. */
+  min-height: 48px;
+}
+.create-flow :where(h1, [role="alert"]):focus { outline: none; }
+.create-actions { padding-bottom: max(0.85rem, env(safe-area-inset-bottom)); }
+.create-back { display: inline-flex; align-items: center; gap: 0.5rem; }
+.step-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 64px;
+  width: 100%;
+  padding: 0.25rem;
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.step-link:disabled { cursor: default; color: var(--faint); }
+.step-number {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  transition: background-color 180ms ease-out, color 180ms ease-out;
+}
+.step-link.is-current { color: var(--ink); font-weight: 750; }
+.step-link.is-current .step-number { background: var(--coral); border-color: var(--ink); }
+.step-link.is-complete .step-number { background: var(--mint); border-color: var(--mint); color: var(--ink); }
+.step-progress { transition: transform 220ms var(--ease-out-quart); }
+@keyframes step-forward {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes step-back {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.create-step { animation: step-forward 220ms var(--ease-out-quart) both; }
+.create-step[data-direction="back"] { animation-name: step-back; }
+.create-flow[data-keyboard] .create-step { animation: none; }
+.create-flow[data-keyboard] .step-progress { transition: none; }
+.optional-detail { border-top: 1px solid var(--line-strong); }
+.optional-detail > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 48px;
+  padding: 0.5rem 0;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  list-style: none;
+}
+.optional-detail > summary::-webkit-details-marker { display: none; }
+.optional-detail > summary > [aria-hidden] {
+  margin-left: auto;
+  font-size: 1.2rem;
+  transition: transform 160ms var(--ease-out-quart);
+}
+.optional-detail[open] > summary > [aria-hidden] { transform: rotate(45deg); }
+.optional-detail[open] > :not(summary), .inline-reveal { animation: flash-in 180ms var(--ease-out-quart); }
+.choice-button {
+  border: 1.5px solid var(--line-strong);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: border-color 180ms ease-out, transform 160ms var(--ease-out-quart), background-color 180ms ease-out;
+}
+.choice-button.is-compact { padding: 0.875rem; background: transparent; }
+.choice-button:active { transform: scale(0.985); }
+.choice-arrow { transition: transform 180ms var(--ease-out-quart); }
+.calendar-day { border-color: transparent; transition: background-color 140ms ease-out, transform 120ms var(--ease-out-quart); }
+.calendar-day[aria-pressed="true"] { border-color: var(--ink); }
+.calendar-day:active:not(:disabled) { transform: scale(0.94); }
+.plan-success { animation: flash-in 240ms var(--ease-out-quart) both; }
+.invite-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6px;
+  background: var(--coral);
+}
+@media (hover: hover) and (pointer: fine) {
+  .choice-button:hover { border-color: var(--ink); background: var(--accent-wash); }
+  .choice-button:hover .choice-arrow { transform: translateX(3px); }
+  .step-link:not(:disabled):hover .step-number { border-color: var(--ink); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .create-step, .inline-reveal, .plan-success, .optional-detail[open] > :not(summary) { animation: none; }
+  .step-progress, .choice-arrow, .choice-button, .calendar-day { transition: none; }
+  .choice-button:active, .calendar-day:active:not(:disabled) { transform: none; }
+}

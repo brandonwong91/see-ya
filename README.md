@@ -1,0 +1,154 @@
+# See Ya!
+
+A small, **stateful event-calendar tool for organisers**. Propose a few dates,
+drop a pin on the venue with an open-source map, and let invitees choose the
+dates that work — or suggest their own. Everyone gets an emailed copy of the
+event, and updated invites go out automatically whenever the date, time or
+venue changes.
+
+- **No accounts.** Each event is tracked by a unique reference. The organiser
+  holds a private link with an edit token; invitees use a public link.
+- **State** lives in [Pantry](https://getpantry.cloud) — one JSON basket per
+  event (`event-<id>`).
+- **Email** goes through [Resend](https://resend.com).
+- **Maps** use [Leaflet](https://leafletjs.com) + OpenStreetMap tiles and
+  [Nominatim](https://nominatim.org) geocoding. No Google, no API key.
+
+---
+
+## Quick start
+
+```bash
+npm install
+cp env.example .env.local     # then fill in the values (see below)
+npm run dev                   # http://localhost:3000
+```
+
+Without a `PANTRY_ID` the app falls back to a local `.pantry-dev/` JSON folder,
+and without a `RESEND_API_KEY` it prints emails to the server console instead of
+sending them — so `npm run dev` works out of the box for a look around.
+
+## Environment variables
+
+| Variable               | Required | Purpose                                                                                                   |
+| ---------------------- | -------- | -------------------------------------------------------------------------------------------------------- |
+| `PANTRY_ID`            | prod     | Your Pantry UUID from getpantry.cloud. The only credential Pantry uses. Unset → local `.pantry-dev/` store. |
+| `PANTRY_ENCRYPTION_KEY` | prod     | Server-only, base64-encoded 32-byte key. Encrypts full plans before upload to Pantry. Keep the same key across deployments. |
+| `RESEND_API_KEY`       | prod     | Resend API key. Unset → emails are logged, not sent.                                                     |
+| `EMAIL_FROM`           | prod     | Sender, e.g. `See Ya! <events@yourdomain.com>`. See the note below.                                   |
+| `NEXT_PUBLIC_BASE_URL` | prod     | Public origin for links inside emails, no trailing slash.                                                |
+| `EMAIL_DRY_RUN`        | no       | `1` to force console logging even when a Resend key is present.                                          |
+
+### Encrypted storage
+
+Before using remote Pantry, generate `PANTRY_ENCRYPTION_KEY` once and save it
+in your server environment:
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
+```
+
+The server encrypts each complete plan with AES-256-GCM, a fresh random nonce,
+and authentication tied to the basket name. Pantry receives an envelope with
+encrypted data, not readable names, emails, notes, venue details, or edit
+tokens. Basket names and Pantry's own metadata remain visible. Reads decrypt
+on the server before producing the existing public or organiser views.
+
+Keep the key backed up outside Pantry and reuse it on every server instance.
+Do not use a `NEXT_PUBLIC_` variable for it. Losing or replacing the key makes
+existing encrypted plans unreadable; restoring the original key restores
+access. Remote writes fail if the key is missing or malformed.
+
+Existing plaintext plans remain readable and become encrypted on their next
+successful save. Enabling encryption does **not** rewrite all existing baskets.
+The local development store also encrypts when a key is set; without one it
+continues to use plaintext files.
+
+This protects storage in Pantry. Resend still receives email addresses and
+message contents to deliver invitations, and the app still displays the data
+allowed by each public, guest, or organiser link. It is not end-to-end email
+encryption.
+
+### About the Resend sender
+
+To email **arbitrary invitees** you must verify a sending domain in Resend and
+set `EMAIL_FROM` to an address on it. Until then, Resend only delivers to the
+address that owns the Resend account (its test mode). Everything else works —
+the emails just won't reach outside recipients.
+
+## How it works
+
+Creation is a mobile-first, five-step flow: Plan, Dates, Place, People, and
+Review. Optional choices advance immediately; multi-date and guest entry wait
+for Continue. Review includes edit shortcuts that return straight to the
+summary. Nothing is sent until Create plan is pressed.
+
+Motion uses short CSS transitions for step direction, progress, selections,
+and confirmation. Timing follows [Emil Kowalski's easing guidance](https://animations.dev/learn/animation-theory/the-easing-blueprint),
+with [reduced-motion alternatives](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion).
+The venue map loads only when requested.
+
+| Page                          | Who      | What                                                                                                    |
+| ----------------------------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| `/`                           | anyone   | Landing page with reference lookup. Opens the public plan; organiser access still requires the private management link. |
+| `/create`                     | organiser| Title, description, organiser name/email, candidate dates, optional time, venue (map). Creates the event, emails the organiser their two links. |
+| `/event/{id}`                 | invitees | Event details + venue map. Enter name & email, tick available dates or propose new ones, add a note. Gets a tracking-copy email. |
+| `/event/{id}/manage?token=…`  | organiser| Availability grid, best-date hint, edit details, invite people, finalise a date, activity log.         |
+
+### Stateful updates
+
+- Editing **date / time / venue** bumps the event version, appends a change-log
+  entry, and re-sends an invitation (with the diff spelled out) to everyone who
+  has responded or been invited.
+- **Finalising** a date closes responses and emails every participant plus the
+  organiser a confirmation with an `.ics` calendar attachment.
+- Invitees can revisit their own `?e=<inviteeId>` link to change their answer.
+
+## API
+
+All under `/api`, JSON in/out. Mutating organiser routes require
+`?token=<editToken>`.
+
+| Method & path                       | Purpose                            |
+| ----------------------------------- | ---------------------------------- |
+| `POST /api/events`                  | Create an event.                   |
+| `GET /api/events/{id}`              | Public projection, or full (`?token=`), or one invitee (`?e=`). |
+| `PATCH /api/events/{id}`            | Edit; re-invites on material change.|
+| `POST /api/events/{id}/rsvp`        | Submit / update availability.      |
+| `POST /api/events/{id}/invite`     | Add invitees and email them.       |
+| `POST /api/events/{id}/finalize`   | Lock a date (`{dateId}`) or re-open (`{reopen:true}`). |
+| `GET /api/events/{id}/ics`          | Calendar file for a finalised event.|
+| `GET /api/geocode?q=` / `…/reverse` | Nominatim proxy (server-side UA).  |
+
+## Deploy (Vercel)
+
+```bash
+npm i -g vercel
+vercel            # link the project
+vercel env add PANTRY_ID
+vercel env add PANTRY_ENCRYPTION_KEY   # use the same backed-up key as existing data
+vercel env add RESEND_API_KEY
+vercel env add EMAIL_FROM
+vercel env add NEXT_PUBLIC_BASE_URL     # your production URL
+vercel --prod
+```
+
+## Notes & limitations
+
+- **Concurrency**: writes are read-modify-write against Pantry, which has no
+  compare-and-set. Two RSVPs landing in the same ~200 ms can race; fine at the
+  scale this is built for, not for high traffic.
+- **Pantry rate limits**: each server process spaces upstream requests at least
+  1.1 seconds apart, retries temporary failures with backoff, and respects
+  `Retry-After`. Long cooldowns return a temporary-unavailable response with a
+  retry time. Multiple server instances still share the upstream quota.
+- **Pantry expiry**: baskets are wiped after 30 days of inactivity.
+- **Nominatim**: bound by the [OSM usage policy](https://operations.osmfoundation.org/policies/nominatim/)
+  — low volume only. Swap in a hosted geocoder for anything busier.
+- `npm audit` flags a build-time-only `postcss` advisory inside Next's bundled
+  toolchain; it doesn't affect the running app. Resolves when you bump Next.
+
+## Stack
+
+Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · Zod ·
+Leaflet / react-leaflet · Resend · Pantry
