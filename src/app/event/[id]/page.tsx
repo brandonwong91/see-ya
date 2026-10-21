@@ -1,12 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { loadEvent, toPublicEvent } from "@/lib/events";
+import { loadEvent, shareSummary, toPublicEvent } from "@/lib/events";
+import { publicUrl } from "@/lib/email";
 import { formatDateLong, formatTime } from "@/lib/format";
 import { SiteHeader, SiteFooter } from "@/components/Chrome";
 import { StoreError } from "@/components/StoreError";
 import { MapView } from "@/components/map/MapView";
 import { RsvpForm } from "@/components/RsvpForm";
+import { CalendarButtons } from "@/components/CalendarButtons";
 
 export async function generateMetadata({
   params,
@@ -16,9 +18,19 @@ export async function generateMetadata({
   const { id } = await params;
   const { event } = await loadEvent(id);
   if (!event) return { title: "Plan not found — See Ya!" };
+  const title = `${event.title} — See Ya!`;
+  const description = shareSummary(event);
   return {
-    title: `${event.title} — See Ya!`,
-    description: event.description || `You're invited by ${event.organiser.name}.`,
+    title,
+    description,
+    openGraph: {
+      title: event.title,
+      description,
+      type: "website",
+      siteName: "See Ya!",
+      url: `/event/${event.id}`,
+    },
+    twitter: { card: "summary_large_image", title: event.title, description },
   };
 }
 
@@ -149,13 +161,20 @@ export default async function PublicEventPage({
           )}
         </div>
 
+        {event.dateOptions.length > 0 && (
+          <div className="mt-12">
+            <CalendarButtons event={event} shareUrl={publicUrl(record)} />
+          </div>
+        )}
+
         <p className="mt-10 text-xs font-medium text-muted">
           Sorted with{" "}
           <Link href="/" className="font-bold text-grape-ink underline underline-offset-2">
             See Ya!
           </Link>
-          . Your name and email go only to the organiser, to send you the invite
-          and any updates.
+          . Names on the guest list are visible to anyone with this link; your
+          email and answers go only to the organiser, to send you the invite and
+          any updates.
         </p>
       </main>
       <SiteFooter />

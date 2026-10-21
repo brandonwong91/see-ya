@@ -103,6 +103,36 @@ The venue map loads only when requested.
 - **Finalising** a date closes responses and emails every participant plus the
   organiser a confirmation with an `.ics` calendar attachment.
 - Invitees can revisit their own `?e=<inviteeId>` link to change their answer.
+  The browser also remembers who you are on each plan (localStorage), and the
+  `?e=` is tidied out of the address bar so it isn't pasted into group chats.
+
+### Guest list and claiming names
+
+- The organiser can list guests by **name only**; emails are optional. Guests
+  with an email get an invitation; everyone else claims their name from the
+  share link.
+- On the share link, tapping an unclaimed name claims it. The browser keeps the
+  claim, so returning visitors land on their own answers.
+- Tapping a name that has an email sends that address its personal link
+  instead (at most once per 10 minutes), so nobody can take over an emailed
+  guest from the share link.
+- Tapping a name that's already claimed lets the visitor **request** it. An email
+  is required: they get an acknowledgement, the organiser gets an email and an
+  Approve / Decline card on the dashboard, and the requester hears the outcome.
+  Approving gives the invitee a new id (signing out the earlier claimer) and
+  emails the requester their personal link.
+- The public roster uses opaque seat ids derived from the edit token, never the
+  invitee ids themselves.
+
+### Calendar and link previews
+
+- The public page ends with **Add to calendar** (Google Calendar or `.ics`). Before
+  a date is locked in, it offers a tentative hold for any proposed date; holds
+  share a UID with the confirmed entry, so the confirmation updates them.
+- Invitation, response, update, confirmation and approval emails carry the
+  same calendar links.
+- Share links have a summary in their description / Open Graph / Twitter tags
+  (host, leading dates, time, venue, reply count) and a generated preview image.
 
 ## API
 
@@ -117,7 +147,10 @@ All under `/api`, JSON in/out. Mutating organiser routes require
 | `POST /api/events/{id}/rsvp`        | Submit / update availability.      |
 | `POST /api/events/{id}/invite`     | Add invitees and email them.       |
 | `POST /api/events/{id}/finalize`   | Lock a date (`{dateId}`) or re-open (`{reopen:true}`). |
-| `GET /api/events/{id}/ics`          | Calendar file for a finalised event.|
+| `GET /api/events/{id}/ics`          | Calendar file for the confirmed date, or `?date=<optionId>` for a tentative hold.|
+| `POST /api/events/{id}/claim`       | Claim a listed name (`{seatId}`), or email its personal link. |
+| `POST /api/events/{id}/claim-requests` | Ask the organiser for a claimed name (email required). |
+| `POST /api/events/{id}/claim-requests/resolve` | Organiser approves / declines (`{requestId, approve}`). |
 | `GET /api/geocode?q=` / `…/reverse` | Nominatim proxy (server-side UA).  |
 
 ## Deploy (Vercel)

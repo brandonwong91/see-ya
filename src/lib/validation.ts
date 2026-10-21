@@ -9,7 +9,18 @@ const hhmm = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Time must be HH:mm");
 
+/** Email that may be left blank; normalises to "" when absent. */
+const optionalEmail = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.union([z.literal(""), z.string().email("Enter a valid email").max(200)]))
+  .default("");
+
 export const personSchema = z.object({ name, email });
+
+/** A guest on the invite list: a name is enough, email is optional. */
+export const guestSchema = z.object({ name, email: optionalEmail });
 
 export const venueSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -30,7 +41,7 @@ export const createEventSchema = z.object({
     .min(1, "Propose at least one date")
     .max(20, "That's a lot of dates — keep it under 20"),
   /** Optional invitees to email as soon as the event is created. */
-  invitees: z.array(personSchema).max(200).optional().default([]),
+  invitees: z.array(guestSchema).max(200).optional().default([]),
   inviteMessage: z.string().trim().max(2000).optional().default(""),
 });
 
@@ -48,8 +59,10 @@ export const patchEventSchema = z
   .refine((v) => Object.keys(v).length > 0, "Nothing to update");
 
 export const rsvpSchema = z.object({
+  /** Present when responding as a claimed name or via a personal link. */
+  inviteeId: z.string().min(1).max(40).optional(),
   name,
-  email,
+  email: optionalEmail,
   availableDateIds: z.array(z.string().min(1)).default([]),
   /** New dates this invitee wants to propose (ISO). */
   proposeDates: z.array(isoDate).max(10).default([]),
@@ -58,10 +71,26 @@ export const rsvpSchema = z.object({
 
 export const inviteSchema = z.object({
   people: z
-    .array(personSchema)
+    .array(guestSchema)
     .min(1, "Add at least one person")
     .max(200, "Send in smaller batches (max 200)"),
   message: z.string().trim().max(2000).default(""),
+});
+
+export const claimSchema = z.object({
+  seatId: z.string().min(1).max(40),
+});
+
+export const claimRequestSchema = z.object({
+  seatId: z.string().min(1).max(40),
+  name,
+  email,
+  message: z.string().trim().max(1000).default(""),
+});
+
+export const resolveClaimSchema = z.object({
+  requestId: z.string().min(1).max(40),
+  approve: z.boolean(),
 });
 
 export const finalizeSchema = z.object({
@@ -72,4 +101,5 @@ export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type PatchEventInput = z.infer<typeof patchEventSchema>;
 export type RsvpInput = z.infer<typeof rsvpSchema>;
 export type InviteInput = z.infer<typeof inviteSchema>;
+export type ClaimRequestInput = z.infer<typeof claimRequestSchema>;
 export type FinalizeInput = z.infer<typeof finalizeSchema>;

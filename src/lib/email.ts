@@ -1,6 +1,7 @@
 import { Resend } from "resend";
-import type { DateOption, EventRecord, Invitee } from "./types";
+import type { ClaimRequest, DateOption, EventRecord, Invitee } from "./types";
 import { buildIcs } from "./ics";
+import { googleCalendarUrl, icsPath } from "./calendar";
 import { formatDateLong, formatTime } from "./format";
 
 const DRY_RUN =
@@ -44,6 +45,8 @@ interface OutgoingEmail {
 }
 
 async function send(mail: OutgoingEmail): Promise<void> {
+  // Name-only guests have nowhere to send to.
+  if (!mail.to) return;
   if (DRY_RUN || !resend) {
     console.log(
       `\n─── EMAIL (dry run) ───────────────────────────\nTo: ${mail.to}\nSubject: ${mail.subject}\n${mail.text}\n───────────────────────────────────────────────\n`,
@@ -134,6 +137,71 @@ function row(label: string, value: string): string {
   </tr>`;
 }
 
+function finalDateOf(event: EventRecord): DateOption | undefined {
+  return event.dateOptions.find((d) => d.id === event.finalizedDateId);
+}
+
+/**
+ * "Add to calendar" block. Once the plan is locked in it's a pair of buttons
+ * for the confirmed date; before that, a compact list of tentative holds for
+ * `dates` so people can pencil them in.
+ */
+function calendarBlock(event: EventRecord, dates: DateOption[]): string {
+  // The plain share link, never a personal `?e=` one: calendar entries get
+  // shared and synced in ways an email doesn't.
+  const link = publicUrl(event);
+  const final = finalDateOf(event);
+  if (final) {
+    const google = googleCalendarUrl(event, final.date, { link });
+    const ics = baseUrl() + icsPath(event.id);
+    return `
+      <p style="font-family:${SANS};font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${MUTED};margin:22px 0 6px">Add to calendar</p>
+      ${btn(escapeHtml(google), "Google Calendar")} ${btn(ics, "Apple / Outlook (.ics)")}`;
+  }
+  if (!dates.length) return "";
+  const rows = dates
+    .map((d) => {
+      const google = googleCalendarUrl(event, d.date, { tentative: true, link });
+      const ics = baseUrl() + icsPath(event.id, d.id);
+      return `<tr>
+        <td style="padding:6px 0;font-family:${SANS};font-size:14px">${formatDateLong(d.date)}</td>
+        <td align="right" style="padding:6px 0;font-family:${SANS};font-size:13px;white-space:nowrap">
+          <a href="${escapeHtml(google)}" style="color:${INK};font-weight:700">Google</a>
+          <span style="color:${MUTED}">&nbsp;·&nbsp;</span>
+          <a href="${ics}" style="color:${INK};font-weight:700">Apple / Outlook</a>
+        </td>
+      </tr>`;
+    })
+    .join("");
+  return `
+    <p style="font-family:${SANS};font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${MUTED};margin:22px 0 6px">Pencil it in (tentative)</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${LINE}">${rows}</table>`;
+}
+
+function calendarText(event: EventRecord, dates: DateOption[]): string {
+  const link = publicUrl(event);
+  const final = finalDateOf(event);
+  if (final) {
+    return `\nAdd to calendar:\n- Google: ${googleCalendarUrl(event, final.date, { link })}\n- Apple / Outlook: ${baseUrl() + icsPath(event.id)}\n`;
+  }
+  if (!dates.length) return "";
+  return (
+    `\nPencil it in (tentative):\n` +
+    dates
+      .map(
+        (d) =>
+          `- ${formatDateLong(d.date)}: ${googleCalendarUrl(event, d.date, { tentative: true, link })} | ${baseUrl() + icsPath(event.id, d.id)}`,
+      )
+      .join("\n") +
+    "\n"
+  );
+}
+
+export function maskEmail(email: string): string {
+  const [user, domain = ""] = email.split("@");
+  return `${user.slice(0, 1)}•••@${domain}`;
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
@@ -154,8 +222,9 @@ export async function sendOrganiserConfirmation(
     ${p(`<strong>1. Manage link</strong> (keep private — anyone with it can edit):<br>${btn(manage, "Open organiser dashboard")}`)}
     ${p(`<strong>2. Share link</strong> (send to invitees so they can pick dates):<br><a href="${share}" style="color:${INK}">${share}</a>`)}
     ${p(`Event reference: <code style="font-family:ui-monospace,Menlo,monospace">${event.id}</code>`)}
+    ${calendarBlock(event, event.dateOptions)}
   `;
-  const text = `${event.title}\n\nYour event is live. Keep this email as your tracking copy.\n\nManage (private): ${manage}\nShare with invitees: ${share}\n\nReference: ${event.id}`;
+  const text = `${event.title}\n\nYour event is live. Keep this email as your tracking copy.\n\nManage (private): ${manage}\nShare with invitees: ${share}\n\nReference: ${event.id}\n${calendarText(event, event.dateOptions)}`;
   await send({
     to: event.organiser.email,
     subject: `Your event is live — ${event.title}`,
@@ -178,8 +247,9 @@ export async function sendInvitation(
     ${detailBlock(event, event.dateOptions)}
     ${p(`Tap below to mark which dates work for you (or suggest another):`)}
     ${btn(link, "Choose your dates")}
+    ${calendarBlock(event, event.dateOptions)}
   `;
-  const text = `You're invited: ${event.title}\n\n${event.organiser.name} invited you to help pick a date.\n${message ? `\n"${message}"\n` : ""}\nRespond here: ${link}`;
+  const text = `You're invited: ${event.title}\n\n${event.organiser.name} invited you to help pick a date.\n${message ? `\n"${message}"\n` : ""}\nRespond here: ${link}\n${calendarText(event, event.dateOptions)}`;
   await send({
     to: invitee.email,
     subject: `Invitation: ${event.title}`,
@@ -209,8 +279,9 @@ export async function sendRsvpConfirmation(
     ${p(`Need to change your answer? Use the same link:`)}
     ${btn(link, "Update my availability")}
     ${p(`We'll email you if the organiser changes the date, time or venue.`)}
+    ${calendarBlock(event, chosen)}
   `;
-  const text = `Thanks, ${invitee.name}.\n\nYour availability for "${event.title}" is recorded.\n${chosen.length ? `\nYou're free:\n${chosen.map((d) => "- " + formatDateLong(d.date)).join("\n")}\n` : ""}\nUpdate anytime: ${link}`;
+  const text = `Thanks, ${invitee.name}.\n\nYour availability for "${event.title}" is recorded.\n${chosen.length ? `\nYou're free:\n${chosen.map((d) => "- " + formatDateLong(d.date)).join("\n")}\n` : ""}\nUpdate anytime: ${link}\n${calendarText(event, chosen)}`;
   await send({
     to: invitee.email,
     subject: `Your response to ${event.title}`,
@@ -233,8 +304,9 @@ export async function sendEventUpdated(
     ${detailBlock(event, event.dateOptions)}
     ${p(`Please review — your earlier availability may no longer apply:`)}
     ${btn(link, "Review and re-confirm")}
+    ${calendarBlock(event, event.dateOptions)}
   `;
-  const text = `Update: ${event.title}\n\n${event.organiser.name} changed:\n${changes.map((c) => "- " + c).join("\n")}\n\nReview: ${link}`;
+  const text = `Update: ${event.title}\n\n${event.organiser.name} changed:\n${changes.map((c) => "- " + c).join("\n")}\n\nReview: ${link}\n${calendarText(event, event.dateOptions)}`;
   await send({
     to: recipient.email,
     subject: `Changed: ${event.title}`,
@@ -263,8 +335,9 @@ export async function sendEventFinalized(
     </table>
     ${p(`A calendar invite (.ics) is attached. Details are also here:`)}
     ${btn(link, "View event")}
+    ${calendarBlock(event, [finalDate])}
   `;
-  const text = `Confirmed: ${event.title}\n\nDate: ${formatDateLong(finalDate.date)}\n${event.time ? `Time: ${formatTime(event.time)}\n` : ""}${event.venue ? `Venue: ${event.venue.name}, ${event.venue.address}\n` : ""}\n${link}`;
+  const text = `Confirmed: ${event.title}\n\nDate: ${formatDateLong(finalDate.date)}\n${event.time ? `Time: ${formatTime(event.time)}\n` : ""}${event.venue ? `Venue: ${event.venue.name}, ${event.venue.address}\n` : ""}\n${link}\n${calendarText(event, [finalDate])}`;
   await send({
     to: recipient.email,
     subject: `Confirmed: ${event.title} — ${formatDateLong(finalDate.date)}`,
@@ -277,5 +350,114 @@ export async function sendEventFinalized(
         content: Buffer.from(ics, "utf-8").toString("base64"),
       },
     ],
+  });
+}
+
+// ─── Claiming names ─────────────────────────────────────────────────────────
+
+/** Someone tapped a listed name that has an email: send that person their own
+ *  link rather than handing the name to whoever is holding the share link. */
+export async function sendPersonalLink(
+  event: EventRecord,
+  invitee: Invitee,
+): Promise<void> {
+  const link = `${publicUrl(event)}?e=${invitee.id}`;
+  const inner = `
+    ${h1(`Your link for ${event.title}`)}
+    ${p(`Someone opened the share link for <strong>${escapeHtml(event.title)}</strong> and said they're ${escapeHtml(invitee.name)}. If that was you, here's your personal link:`)}
+    ${btn(link, "Open my invite")}
+    ${p(`<span style="color:${MUTED}">Not you? You can ignore this email — nothing changes until you use the link.</span>`)}
+  `;
+  const text = `Your link for ${event.title}\n\nSomeone said they're ${invitee.name} on the share link. If that was you: ${link}\n\nNot you? Ignore this email.`;
+  await send({
+    to: invitee.email,
+    subject: `Your link: ${event.title}`,
+    html: shell(inner),
+    text,
+    replyTo: event.organiser.email,
+  });
+}
+
+export async function sendClaimRequestToOrganiser(
+  event: EventRecord,
+  request: ClaimRequest,
+): Promise<void> {
+  const manage = manageUrl(event);
+  const inner = `
+    ${h1(`Name request: ${event.title}`)}
+    ${p(`<strong>${escapeHtml(request.name)}</strong> (${escapeHtml(request.email)}) says they're <strong>${escapeHtml(request.seatName)}</strong> on your guest list, but that name has already been claimed.`)}
+    ${request.message ? p(`<em>"${escapeHtml(request.message)}"</em>`) : ""}
+    ${p(`Approving gives them the name and its answers, and signs out whoever claimed it before. Either way, they'll get an email.`)}
+    ${btn(manage, "Review the request")}
+  `;
+  const text = `Name request: ${event.title}\n\n${request.name} <${request.email}> says they're "${request.seatName}" on your guest list, but that name is already claimed.\n${request.message ? `\n"${request.message}"\n` : ""}\nReview: ${manage}`;
+  await send({
+    to: event.organiser.email,
+    subject: `${request.name} is asking to be "${request.seatName}" — ${event.title}`,
+    html: shell(inner),
+    text,
+    replyTo: request.email,
+  });
+}
+
+export async function sendClaimRequestReceived(
+  event: EventRecord,
+  request: ClaimRequest,
+): Promise<void> {
+  const inner = `
+    ${h1(`Request sent`)}
+    ${p(`We've asked ${escapeHtml(event.organiser.name)} to confirm you're <strong>${escapeHtml(request.seatName)}</strong> for <strong>${escapeHtml(event.title)}</strong>.`)}
+    ${p(`You'll get another email as soon as they decide — with your personal link if it's approved.`)}
+    ${detailBlock(event, event.dateOptions)}
+  `;
+  const text = `Request sent\n\nWe've asked ${event.organiser.name} to confirm you're "${request.seatName}" for ${event.title}. You'll get another email once they decide.`;
+  await send({
+    to: request.email,
+    subject: `Request sent: ${event.title}`,
+    html: shell(inner),
+    text,
+    replyTo: event.organiser.email,
+  });
+}
+
+export async function sendClaimResolved(
+  event: EventRecord,
+  request: ClaimRequest,
+  invitee: Invitee | null,
+): Promise<void> {
+  if (request.status === "approved" && invitee) {
+    const link = `${publicUrl(event)}?e=${invitee.id}`;
+    const inner = `
+      ${h1(`You're ${escapeHtml(request.seatName)} — all set`)}
+      ${p(`${escapeHtml(event.organiser.name)} approved your request for <strong>${escapeHtml(event.title)}</strong>. Use your personal link to pick your dates:`)}
+      ${btn(link, "Open my invite")}
+      ${detailBlock(event, event.dateOptions)}
+      ${p(`We'll email you at ${escapeHtml(maskEmail(invitee.email))} if the date, time or venue changes.`)}
+      ${calendarBlock(event, event.dateOptions)}
+    `;
+    const text = `Approved: you're "${request.seatName}" for ${event.title}.\n\nYour personal link: ${link}\n${calendarText(event, event.dateOptions)}`;
+    await send({
+      to: request.email,
+      subject: `Approved: ${event.title}`,
+      html: shell(inner),
+      text,
+      replyTo: event.organiser.email,
+    });
+    return;
+  }
+  const share = publicUrl(event);
+  const inner = `
+    ${h1(`About your request`)}
+    ${p(`${escapeHtml(event.organiser.name)} didn't confirm you as <strong>${escapeHtml(request.seatName)}</strong> for <strong>${escapeHtml(event.title)}</strong>. You can still respond under your own name:`)}
+    ${btn(share, "Respond as myself")}
+    ${p(`<span style="color:${MUTED}">Think it's a mix-up? Reply to this email to reach the organiser.</span>`)}
+  `;
+  const text = `About your request\n\n${event.organiser.name} didn't confirm you as "${request.seatName}" for ${event.title}. You can still respond under your own name: ${share}\n\nReply to this email to reach the organiser.`;
+  await send({
+    to: request.email,
+    subject: `Update on your request: ${event.title}`,
+    html: shell(inner),
+    text,
+    replyTo: event.organiser.email,
   });
 }

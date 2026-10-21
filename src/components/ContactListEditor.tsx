@@ -5,7 +5,9 @@ export interface ContactRow {
   email: string;
 }
 
-/** Accepts "Name <email>" or "Name, email" or bare "email" per line. */
+/** Accepts "Name <email>", "Name, email", bare "email", or just "Name" per
+ *  line. Commas only split when the second part looks like an email, so a
+ *  plain comma-separated list of names works too. */
 export function parseContactList(text: string): ContactRow[] {
   const parsed: ContactRow[] = [];
   for (const line of text.split(/[\n;]+/)) {
@@ -21,13 +23,22 @@ export function parseContactList(text: string): ContactRow[] {
       parsed.push({ name: comma[0], email: comma[1] });
       continue;
     }
-    if (t.includes("@")) parsed.push({ name: t.split("@")[0], email: t });
+    if (t.includes("@")) {
+      parsed.push({ name: t.split("@")[0], email: t });
+      continue;
+    }
+    for (const name of comma) if (name) parsed.push({ name, email: "" });
   }
   return parsed;
 }
 
+const looksLikeEmail = (v: string) => /.+@.+\..+/.test(v.trim());
+
+/** Rows ready to send: a name, and an email only if one was typed. */
 export function validContactRows(rows: ContactRow[]): ContactRow[] {
-  return rows.filter((r) => r.name.trim() && /.+@.+\..+/.test(r.email));
+  return rows.filter(
+    (r) => r.name.trim() && (!r.email.trim() || looksLikeEmail(r.email)),
+  );
 }
 
 export function ContactListEditor({
@@ -66,19 +77,18 @@ export function ContactListEditor({
               aria-label={`Guest ${i + 1} name`}
               autoComplete="off"
               maxLength={120}
-              required={Boolean(r.name.trim() || r.email.trim())}
+              required={Boolean(r.email.trim())}
               value={r.name}
               onChange={(e) => setRow(i, { name: e.target.value })}
             />
             <input
               type="email"
               className="field min-w-0"
-              placeholder="email@example.com"
+              placeholder="Email (optional)"
               aria-label={`Guest ${i + 1} email`}
               autoComplete="off"
               autoCapitalize="none"
               maxLength={200}
-              required={Boolean(r.name.trim() || r.email.trim())}
               value={r.email}
               onChange={(e) => setRow(i, { email: e.target.value })}
             />
@@ -108,9 +118,9 @@ export function ContactListEditor({
         <textarea
           className="field mt-2"
           rows={3}
-          aria-label="Paste guest names and emails"
+          aria-label="Paste guest names, with or without emails"
           placeholder={
-            "Aisha Khan <aisha@example.com>\nMarco, marco@example.com\njo@example.com"
+            "Aisha Khan <aisha@example.com>\nMarco, marco@example.com\nJo\nSam, Priya, Wei"
           }
           onChange={(e) => parseBulk(e.target.value)}
         />

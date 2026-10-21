@@ -1,17 +1,22 @@
+import { createHash } from "node:crypto";
 import { getBasket, putBasket, PantryError } from "./pantry";
 import { cache } from "react";
 import { newEditToken, newEventId, newSubId } from "./ids";
-import { formatDateLong, formatTime } from "./format";
+import { formatDateLong, formatDateShort, formatTime } from "./format";
 import type {
+  ClaimRequest,
   DateOption,
   EventRecord,
   Invitee,
   ManageEvent,
   Person,
   PublicEvent,
+  Seat,
+  SeatStatus,
   Venue,
 } from "./types";
 import type {
+  ClaimRequestInput,
   CreateEventInput,
   InviteInput,
   PatchEventInput,
@@ -75,11 +80,13 @@ export async function createEvent(
   }));
 
   const invitees: Invitee[] = [];
-  const seenEmails = new Set<string>();
   for (const person of input.invitees ?? []) {
     const email = person.email.toLowerCase();
-    if (seenEmails.has(email)) continue;
-    seenEmails.add(email);
+    const existing = findGuest(invitees, person.name, email);
+    if (existing) {
+      if (email && !existing.email) existing.email = email;
+      continue;
+    }
     invitees.push({
       id: newSubId(),
       name: person.name,
@@ -108,6 +115,7 @@ export async function createEvent(
     finalizedDateId: null,
     invitees,
     changeLog: [{ at: now, version: 1, summary: "Event created", fields: [] }],
+    claimRequests: [],
   };
 
   await putBasket(basketName(id), event);
@@ -208,7 +216,15 @@ export function applyRsvp(event: EventRecord, input: RsvpInput): RsvpResult {
   const now = new Date().toISOString();
   const email = input.email.toLowerCase();
 
-  let invitee = event.invitees.find((i) => i.email.toLowerCase() === email);
+  // A claimed name or personal link identifies the guest directly; otherwise
+  // fall back to matching on email, as before.
+  let invitee =
+    (input.inviteeId
+      ? event.invitees.find((i) => i.id === input.inviteeId)
+      : undefined) ??
+    (email
+      ? event.invitees.find((i) => i.email.toLowerCase() === email)
+      : undefined);
   const isNew = !invitee;
   if (!invitee) {
     invitee = {
@@ -224,6 +240,10 @@ export function applyRsvp(event: EventRecord, input: RsvpInput): RsvpResult {
     event.invitees.push(invitee);
   }
   invitee.name = input.name || invitee.name;
+  if (email && !event.invitees.some((i) => i !== invitee && i.email === email)) {
+    invitee.email = email;
+  }
+  invitee.claimedAt ??= now;
 
   // Invitee-proposed new dates.
   const addedDates: DateOption[] = [];
@@ -274,7 +294,7 @@ export function addInvitees(
   const added: Invitee[] = [];
   for (const person of input.people) {
     const email = person.email.toLowerCase();
-    let invitee = event.invitees.find((i) => i.email.toLowerCase() === email);
+    let invitee = findGuest(event.invitees, person.name, email);
     if (!invitee) {
       invitee = {
         id: newSubId(),
@@ -289,10 +309,136 @@ export function addInvitees(
       event.invitees.push(invitee);
     } else {
       invitee.invitedAt = now;
+      // A name-only guest gains an email when the organiser adds one later.
+      if (email && !invitee.email) invitee.email = email;
     }
     added.push(invitee);
   }
   return { event, invitees: added };
+}
+
+// ─── Claiming names ─────────────────────────────────────────────────────────
+
+/** Public handle for an invitee. Derived from the secret edit token so it can't
+ *  be turned back into the invitee id (which doubles as their personal link). */
+export function seatIdFor(event: EventRecord, invitee: Invitee): string {
+  return createHash("sha256")
+    .update(`${event.editToken}:${invitee.id}`)
+    .digest("base64url")
+    .slice(0, 12);
+}
+
+export function seatStatus(invitee: Invitee): SeatStatus {
+  if (invitee.claimedAt || invitee.respondedAt) return "taken";
+  if (invitee.email) return "emailed";
+  return "open";
+}
+
+export function findSeat(event: EventRecord, seatId: string): Invitee | null {
+  return event.invitees.find((i) => seatIdFor(event, i) === seatId) ?? null;
+}
+
+export function roster(event: EventRecord): Seat[] {
+  return event.invitees
+    .filter((i) => i.invitedAt)
+    .map((i) => ({
+      seatId: seatIdFor(event, i),
+      name: i.name,
+      status: seatStatus(i),
+    }));
+}
+
+export function addClaimRequest(
+  event: EventRecord,
+  invitee: Invitee,
+  input: ClaimRequestInput,
+): ClaimRequest {
+  const requests = (event.claimRequests ??= []);
+  const existing = requests.find(
+    (r) =>
+      r.status === "pending" &&
+      r.inviteeId === invitee.id &&
+      r.email === input.email,
+  );
+  if (existing) {
+    existing.name = input.name;
+    existing.message = input.message;
+    return existing;
+  }
+  if (requests.filter((r) => r.status === "pending").length >= 50) {
+    throw new PantryError(
+      "This plan has too many open requests — ask the organiser directly",
+      429,
+    );
+  }
+  const request: ClaimRequest = {
+    id: newSubId(),
+    inviteeId: invitee.id,
+    seatName: invitee.name,
+    name: input.name,
+    email: input.email,
+    message: input.message,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+    resolvedAt: null,
+  };
+  requests.push(request);
+  return request;
+}
+
+export interface ResolveClaimResult {
+  request: ClaimRequest;
+  invitee: Invitee | null;
+  /** Other pending requests for the same name, declined by an approval. */
+  alsoDeclined: ClaimRequest[];
+}
+
+/** Approving hands the name to the requester: the invitee gets a fresh id, so
+ *  whoever claimed it before loses access, and the requester's email. */
+export function resolveClaimRequest(
+  event: EventRecord,
+  requestId: string,
+  approve: boolean,
+): ResolveClaimResult {
+  const request = event.claimRequests?.find((r) => r.id === requestId);
+  if (!request) throw new PantryError("That request no longer exists", 404);
+  if (request.status !== "pending") {
+    throw new PantryError("That request was already handled", 409);
+  }
+  const now = new Date().toISOString();
+  const invitee = event.invitees.find((i) => i.id === request.inviteeId) ?? null;
+  const alsoDeclined: ClaimRequest[] = [];
+
+  request.resolvedAt = now;
+  if (!approve || !invitee) {
+    request.status = "declined";
+    return { request, invitee: null, alsoDeclined };
+  }
+
+  request.status = "approved";
+  const previousId = invitee.id;
+  invitee.id = newSubId();
+  invitee.claimedAt = now;
+  if (!event.invitees.some((i) => i !== invitee && i.email === request.email)) {
+    invitee.email = request.email;
+  }
+  for (const other of event.claimRequests ?? []) {
+    if (other.status === "pending" && other.inviteeId === previousId) {
+      other.status = "declined";
+      other.resolvedAt = now;
+      alsoDeclined.push(other);
+    }
+  }
+  for (const other of event.claimRequests ?? []) {
+    if (other.inviteeId === previousId) other.inviteeId = invitee.id;
+  }
+  event.changeLog.push({
+    at: now,
+    version: event.version,
+    summary: `${request.name} took over "${invitee.name}" on the guest list`,
+    fields: [],
+  });
+  return { request, invitee, alsoDeclined };
 }
 
 export function finalize(
@@ -355,7 +501,64 @@ export function toPublicEvent(event: EventRecord): PublicEvent {
     finalizedDateId: event.finalizedDateId,
     tally: computeTally(event),
     responseCount: event.invitees.filter((i) => i.respondedAt).length,
+    roster: roster(event),
   };
+}
+
+export interface ShareFacts {
+  host: string;
+  confirmed: boolean;
+  /** "Sat 3 Nov or Sun 4 Nov +1 more", or the confirmed long date. */
+  when: string;
+  time: string | null;
+  where: string | null;
+  replies: number;
+}
+
+/** The handful of facts a link preview needs. Shows the two leading dates
+ *  rather than every option, so it stays short. */
+export function shareFacts(event: EventRecord): ShareFacts {
+  const finalDate = event.dateOptions.find(
+    (d) => d.id === event.finalizedDateId,
+  );
+  let when = "";
+  if (finalDate) {
+    when = formatDateLong(finalDate.date);
+  } else if (event.dateOptions.length) {
+    const tally = computeTally(event);
+    const shown = [...event.dateOptions]
+      .sort((a, b) => tally[b.id] - tally[a.id] || a.date.localeCompare(b.date))
+      .slice(0, 2)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const more = event.dateOptions.length - shown.length;
+    when =
+      shown.map((d) => formatDateShort(d.date)).join(" or ") +
+      (more > 0 ? ` +${more} more` : "");
+  }
+  return {
+    host: event.organiser.name,
+    confirmed: Boolean(finalDate),
+    when,
+    time: event.time ? formatTime(event.time) : null,
+    where: event.venue?.name ?? null,
+    replies: event.invitees.filter((i) => i.respondedAt).length,
+  };
+}
+
+/** One-line description for link previews, e.g. in a group chat. */
+export function shareSummary(event: EventRecord): string {
+  const f = shareFacts(event);
+  const facts = [
+    f.confirmed ? `Confirmed for ${f.when}` : f.when,
+    f.time,
+    f.where,
+  ].filter(Boolean);
+  const tail = f.confirmed
+    ? "See ya there!"
+    : `${f.replies} ${f.replies === 1 ? "reply" : "replies"} so far — tick the dates that work.`;
+  return [`${f.host} is inviting you`, facts.join(" · "), tail]
+    .filter(Boolean)
+    .join(". ");
 }
 
 export function toManageEvent(event: EventRecord): ManageEvent {
@@ -365,12 +568,29 @@ export function toManageEvent(event: EventRecord): ManageEvent {
 }
 
 /** Recipients we should notify on a material change: anyone invited or who
- *  responded, plus the organiser. */
+ *  responded and left an email. */
 export function notifyRecipients(event: EventRecord): Invitee[] {
-  return event.invitees.filter((i) => i.respondedAt || i.invitedAt);
+  return event.invitees.filter(
+    (i) => i.email && (i.respondedAt || i.invitedAt),
+  );
 }
 
 // ─── Internals ──────────────────────────────────────────────────────────────
+
+/** Same person on the list: matching email, or matching name when the
+ *  existing entry has no email to tell them apart. */
+function findGuest(
+  list: Invitee[],
+  name: string,
+  email: string,
+): Invitee | undefined {
+  if (email) {
+    const byEmail = list.find((i) => i.email.toLowerCase() === email);
+    if (byEmail) return byEmail;
+  }
+  const key = name.trim().toLowerCase();
+  return list.find((i) => !i.email && i.name.trim().toLowerCase() === key);
+}
 
 function dedupeDates(dates: string[]): string[] {
   return [...new Set(dates)].sort();

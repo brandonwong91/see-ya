@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AvailabilityGrid } from "./AvailabilityGrid";
+import { ClaimRequests } from "./ClaimRequests";
 import { EditEventPanel } from "./EditEventPanel";
 import { InvitePanel } from "./InvitePanel";
 import { CopyButton } from "@/components/CopyButton";
@@ -161,6 +162,15 @@ export function ManageDashboard({
           </div>
         </div>
       </div>
+
+      <ClaimRequests
+        event={event}
+        token={token}
+        onUpdated={(updated, message) => {
+          setEvent(updated);
+          setFlash(message);
+        }}
+      />
 
       {/* Availability */}
       <section>
