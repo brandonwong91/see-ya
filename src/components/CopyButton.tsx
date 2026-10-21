@@ -15,7 +15,9 @@ export function CopyButton({
   return (
     <button
       type="button"
-      className={`btn btn-ghost !px-3 !py-1.5 text-xs ${
+      aria-label={copied ? "Copied" : label}
+      title={copied ? "Copied" : label}
+      className={`btn btn-ghost shrink-0 !p-2 ${
         copied ? "!bg-mint/20 !border-mint" : ""
       } ${className}`}
       onClick={async () => {
@@ -29,14 +31,32 @@ export function CopyButton({
       }}
     >
       {copied ? (
-        <>
-          <span className="tick-pop text-mint" aria-hidden>
-            ✓
-          </span>
-          Copied
-        </>
+        <svg
+          className="tick-pop h-4 w-4 text-mint"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
       ) : (
-        label
+        <svg
+          className="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <rect x="9" y="9" width="13" height="13" rx="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
       )}
     </button>
   );

@@ -143,22 +143,22 @@ export function ManageDashboard({
 
       {/* Links */}
       <div className="card grid gap-4 p-5 sm:grid-cols-2">
-        <div>
+        <div className="min-w-0">
           <p className="eyebrow mb-1.5">Share with guests</p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 truncate rounded-lg border-2 border-line bg-cream px-2 py-1.5 font-mono text-xs">
+            <code className="min-w-0 flex-1 truncate rounded-lg border-2 border-line bg-cream px-2 py-1.5 font-mono text-xs">
               {shareUrl}
             </code>
-            <CopyButton value={shareUrl} label="Copy" />
+            <CopyButton value={shareUrl} label="Copy share link" />
           </div>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="eyebrow mb-1.5">Your private link — keep it</p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 truncate rounded-lg border-2 border-line bg-cream px-2 py-1.5 font-mono text-xs">
+            <code className="min-w-0 flex-1 truncate rounded-lg border-2 border-line bg-cream px-2 py-1.5 font-mono text-xs">
               {manageUrl.replace(token, token.slice(0, 6) + "…")}
             </code>
-            <CopyButton value={manageUrl} label="Copy" />
+            <CopyButton value={manageUrl} label="Copy private link" />
           </div>
         </div>
       </div>
