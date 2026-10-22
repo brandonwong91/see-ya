@@ -528,3 +528,50 @@ export async function sendCommentToGuest(
     replyTo: event.organiser.email,
   });
 }
+
+// ─── Deleting a plan ────────────────────────────────────────────────────────
+
+/** Sent to the organiser once their plan is gone: the record is deleted, so
+ *  this email is the only copy left of what it held. */
+export async function sendEventDeletedToOrganiser(
+  event: EventRecord,
+  guestsNotified: number,
+): Promise<void> {
+  const responded = event.invitees.filter((i) => i.respondedAt).length;
+  const inner = `
+    ${h1(`Deleted: ${event.title}`)}
+    ${p(`Your plan <strong>${escapeHtml(event.title)}</strong> has been deleted. Its share link and organiser dashboard no longer work, and the guest list, responses and messages are gone.`)}
+    ${detailBlock(event, event.dateOptions)}
+    ${p(`${event.invitees.length} ${event.invitees.length === 1 ? "guest" : "guests"} on the list, ${responded} replied.${guestsNotified ? ` We emailed ${guestsNotified} of them to say it's cancelled.` : ""}`)}
+    ${p(`Event reference: <code style="font-family:ui-monospace,Menlo,monospace">${event.id}</code>`)}
+    ${p(`<span style="color:${MUTED}">Didn't mean to? Deleting can't be undone, but you can start a new plan any time:</span>`)}
+    ${btn(`${baseUrl()}/create`, "Start a new plan")}
+  `;
+  const text = `Deleted: ${event.title}\n\nYour plan has been deleted. Its share link and organiser dashboard no longer work, and the guest list, responses and messages are gone.\n\n${event.invitees.length} on the list, ${responded} replied.${guestsNotified ? ` We emailed ${guestsNotified} of them to say it's cancelled.` : ""}\n\nReference: ${event.id}\n\nStart a new plan: ${baseUrl()}/create`;
+  await send({
+    to: event.organiser.email,
+    subject: `Deleted: ${event.title}`,
+    html: shell(inner),
+    text,
+  });
+}
+
+/** Sent to each guest with an email when the organiser deletes the plan. */
+export async function sendEventCancelled(
+  event: EventRecord,
+  recipient: Invitee,
+): Promise<void> {
+  const inner = `
+    ${h1(`Cancelled: ${event.title}`)}
+    ${p(`${escapeHtml(event.organiser.name)} has cancelled <strong>${escapeHtml(event.title)}</strong> and deleted the plan, so its link no longer works.`)}
+    ${p(`If you added it to your calendar, you can remove it. Reply to this email to reach ${escapeHtml(event.organiser.name)}.`)}
+  `;
+  const text = `Cancelled: ${event.title}\n\n${event.organiser.name} has cancelled "${event.title}" and deleted the plan, so its link no longer works.\n\nIf you added it to your calendar, you can remove it. Reply to this email to reach ${event.organiser.name}.`;
+  await send({
+    to: recipient.email,
+    subject: `Cancelled: ${event.title}`,
+    html: shell(inner),
+    text,
+    replyTo: event.organiser.email,
+  });
+}

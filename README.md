@@ -93,7 +93,7 @@ The venue map loads only when requested.
 | `/`                           | anyone   | Landing page with reference lookup. Opens the public plan; organiser access still requires the private management link. |
 | `/create`                     | organiser| Title, description, organiser name/email, candidate dates, optional time, venue (map). Creates the event, emails the organiser their two links. |
 | `/event/{id}`                 | invitees | Event details + venue map. Enter name & email, tick available dates or propose new ones, add a note. Gets a tracking-copy email. |
-| `/event/{id}/manage?token=…`  | organiser| Availability grid, best-date hint, edit details, invite people, finalise a date, activity log.         |
+| `/event/{id}/manage?token=…`  | organiser| Availability grid, best-date hint, edit details, invite people, finalise a date, activity log, delete. |
 
 ### Stateful updates
 
@@ -102,6 +102,10 @@ The venue map loads only when requested.
   has responded or been invited.
 - **Finalising** a date closes responses and emails every participant plus the
   organiser a confirmation with an `.ics` calendar attachment.
+- **Deleting** a plan (bottom of the dashboard, behind a confirmation dialog)
+  removes it from the store, emails the organiser a confirmation, and by
+  default tells every invited or responding guest with an email that it's
+  cancelled.
 - Invitees can revisit their own `?e=<inviteeId>` link to change their answer.
   The browser also remembers who you are on each plan (localStorage), and the
   `?e=` is tidied out of the address bar so it isn't pasted into group chats.
@@ -160,6 +164,7 @@ All under `/api`, JSON in/out. Mutating organiser routes require
 | `POST /api/events`                  | Create an event.                   |
 | `GET /api/events/{id}`              | Public projection, or full (`?token=`), or one invitee (`?e=`). |
 | `PATCH /api/events/{id}`            | Edit; re-invites on material change.|
+| `DELETE /api/events/{id}`           | Delete the plan; emails the organiser a confirmation and, unless `{notifyGuests:false}`, guests a cancellation. |
 | `POST /api/events/{id}/rsvp`        | Submit / update availability.      |
 | `POST /api/events/{id}/invite`     | Add invitees and email them.       |
 | `POST /api/events/{id}/finalize`   | Lock a date (`{dateId}`) or re-open (`{reopen:true}`). |
