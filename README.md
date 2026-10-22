@@ -124,6 +124,22 @@ The venue map loads only when requested.
 - The public roster uses opaque seat ids derived from the edit token, never the
   invitee ids themselves.
 
+### Messages
+
+- Once a guest has claimed a name (or opened their personal link, or sent in
+  their dates), they can leave a message under the plan, choosing **Everyone**
+  or **Only the organiser**.
+- Public messages show on the share link and are emailed to the organiser and
+  every guest with an email, except the author. Private messages are emailed to
+  the organiser only, with reply-to set to the guest's email when there is one.
+- The dashboard's **Messages** tab lists every message, private ones included,
+  and lets the organiser post to everyone.
+- Each author can post once every 15 seconds, up to 500 messages per plan.
+- Messages belong to whoever wrote them, not to the name. When the organiser
+  approves a request for a claimed name, the earlier claimer's private messages
+  stay visible to the organiser only (marked "Earlier claimer", with their email
+  kept for replies); the new holder never sees them. Public ones stay public.
+
 ### Calendar and link previews
 
 - The public page ends with **Add to calendar** (Google Calendar or `.ics`). Before
@@ -151,6 +167,8 @@ All under `/api`, JSON in/out. Mutating organiser routes require
 | `POST /api/events/{id}/claim`       | Claim a listed name (`{seatId}`), or email its personal link. |
 | `POST /api/events/{id}/claim-requests` | Ask the organiser for a claimed name (email required). |
 | `POST /api/events/{id}/claim-requests/resolve` | Organiser approves / declines (`{requestId, approve}`). |
+| `GET /api/events/{id}/comments`     | Public messages, plus your own private ones with `?e=`. |
+| `POST /api/events/{id}/comments`    | Post (`{inviteeId, body, visibility}`), or `?token=` to post as the organiser. |
 | `GET /api/geocode?q=` / `…/reverse` | Nominatim proxy (server-side UA).  |
 
 ## Deploy (Vercel)

@@ -93,6 +93,13 @@ export const resolveClaimSchema = z.object({
   approve: z.boolean(),
 });
 
+export const commentSchema = z.object({
+  /** The guest posting; omitted when the organiser posts with their token. */
+  inviteeId: z.string().min(1).max(40).optional(),
+  body: z.string().trim().min(1, "Write a message first").max(2000),
+  visibility: z.enum(["public", "organiser"]).default("public"),
+});
+
 export const finalizeSchema = z.object({
   dateId: z.string().min(1),
 });
@@ -102,4 +109,5 @@ export type PatchEventInput = z.infer<typeof patchEventSchema>;
 export type RsvpInput = z.infer<typeof rsvpSchema>;
 export type InviteInput = z.infer<typeof inviteSchema>;
 export type ClaimRequestInput = z.infer<typeof claimRequestSchema>;
+export type CommentInput = z.infer<typeof commentSchema>;
 export type FinalizeInput = z.infer<typeof finalizeSchema>;

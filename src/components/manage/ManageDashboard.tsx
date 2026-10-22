@@ -5,11 +5,12 @@ import { AvailabilityGrid } from "./AvailabilityGrid";
 import { ClaimRequests } from "./ClaimRequests";
 import { EditEventPanel } from "./EditEventPanel";
 import { InvitePanel } from "./InvitePanel";
+import { MessagesPanel } from "./MessagesPanel";
 import { CopyButton } from "@/components/CopyButton";
 import { formatDateLong, formatDateShort } from "@/lib/format";
 import type { ManageEvent } from "@/lib/types";
 
-type Tab = "edit" | "invite" | "activity";
+type Tab = "edit" | "invite" | "messages" | "activity";
 
 export function ManageDashboard({
   initialEvent,
@@ -241,6 +242,10 @@ export function ManageDashboard({
             [
               ["edit", "Edit plan"],
               ["invite", "Invite people"],
+              [
+                "messages",
+                `Messages${event.comments?.length ? ` (${event.comments.length})` : ""}`,
+              ],
               ["activity", "Activity"],
             ] as [Tab, string][]
           ).map(([key, label]) => (
@@ -278,6 +283,16 @@ export function ManageDashboard({
               event={event}
               token={token}
               onUpdated={(updated) => setEvent(updated)}
+            />
+          )}
+          {tab === "messages" && (
+            <MessagesPanel
+              event={event}
+              token={token}
+              onUpdated={(updated, message) => {
+                setEvent(updated);
+                setFlash(message);
+              }}
             />
           )}
           {tab === "activity" && (

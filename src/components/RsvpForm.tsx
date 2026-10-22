@@ -3,30 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { MultiDateCalendar } from "@/components/MultiDateCalendar";
 import { formatDateLong } from "@/lib/format";
+import { recall, remember } from "@/lib/remembered";
 import type { PublicEvent, Seat } from "@/lib/types";
-
-/** The browser remembers who you are on each plan, so a returning guest lands
- *  on their own answers. The value is the invitee id — the same capability as
- *  a personal `?e=` link — and it never leaves this browser except to load
- *  your own response. */
-const storageKey = (eventId: string) => `see-ya:you:${eventId}`;
-
-function remember(eventId: string, inviteeId: string | null) {
-  try {
-    if (inviteeId) localStorage.setItem(storageKey(eventId), inviteeId);
-    else localStorage.removeItem(storageKey(eventId));
-  } catch {
-    // Private mode or storage disabled — they'll just need to claim again.
-  }
-}
-
-function recall(eventId: string): string | null {
-  try {
-    return localStorage.getItem(storageKey(eventId));
-  } catch {
-    return null;
-  }
-}
 
 type SeatPanel =
   | { kind: "emailed"; seat: Seat; sentTo?: string }

@@ -1,7 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { loadEvent, shareSummary, toPublicEvent } from "@/lib/events";
+import {
+  loadEvent,
+  shareSummary,
+  toPublicEvent,
+  visibleComments,
+} from "@/lib/events";
 import { publicUrl } from "@/lib/email";
 import { formatDateLong, formatTime } from "@/lib/format";
 import { SiteHeader, SiteFooter } from "@/components/Chrome";
@@ -9,6 +14,7 @@ import { StoreError } from "@/components/StoreError";
 import { MapView } from "@/components/map/MapView";
 import { RsvpForm } from "@/components/RsvpForm";
 import { CalendarButtons } from "@/components/CalendarButtons";
+import { EventComments } from "@/components/EventComments";
 
 export async function generateMetadata({
   params,
@@ -167,14 +173,24 @@ export default async function PublicEventPage({
           </div>
         )}
 
+        <div className="mt-12">
+          <EventComments
+            eventId={event.id}
+            organiserName={event.organiserName}
+            initialComments={visibleComments(record, you?.id ?? null)}
+            you={you ? { id: you.id, name: you.name } : null}
+            closed={Boolean(finalDate)}
+          />
+        </div>
+
         <p className="mt-10 text-xs font-medium text-muted">
           Sorted with{" "}
           <Link href="/" className="font-bold text-grape-ink underline underline-offset-2">
             See Ya!
           </Link>
-          . Names on the guest list are visible to anyone with this link; your
-          email and answers go only to the organiser, to send you the invite and
-          any updates.
+          . Names on the guest list and messages posted to everyone are visible
+          to anyone with this link; your email and answers go only to the
+          organiser, to send you the invite and any updates.
         </p>
       </main>
       <SiteFooter />
