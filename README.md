@@ -135,6 +135,10 @@ The venue map loads only when requested.
 - The dashboard's **Messages** tab lists every message, private ones included,
   and lets the organiser post to everyone.
 - Each author can post once every 15 seconds, up to 500 messages per plan.
+- Messages belong to whoever wrote them, not to the name. When the organiser
+  approves a request for a claimed name, the earlier claimer's private messages
+  stay visible to the organiser only (marked "Earlier claimer", with their email
+  kept for replies); the new holder never sees them. Public ones stay public.
 
 ### Calendar and link previews
 

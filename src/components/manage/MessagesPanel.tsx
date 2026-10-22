@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ManageEvent } from "@/lib/types";
+import type { Comment, ManageEvent } from "@/lib/types";
 
 /** Every message on the plan, private ones included, plus a box for the
  *  organiser to post to everyone. Private messages are answered by email. */
@@ -19,8 +19,11 @@ export function MessagesPanel({
   const [error, setError] = useState<string | null>(null);
 
   const comments = [...(event.comments ?? [])].reverse();
-  const emailOf = (authorId: string | null) =>
-    authorId ? event.invitees.find((i) => i.id === authorId)?.email ?? "" : "";
+  const emailOf = (c: Comment) =>
+    c.handedOver?.email ??
+    (c.authorId
+      ? event.invitees.find((i) => i.id === c.authorId)?.email ?? ""
+      : "");
 
   async function post(e: React.FormEvent) {
     e.preventDefault();
@@ -81,7 +84,7 @@ export function MessagesPanel({
       ) : (
         <ul className="space-y-3">
           {comments.map((c) => {
-            const email = emailOf(c.authorId);
+            const email = emailOf(c);
             return (
               <li
                 key={c.id}
@@ -96,6 +99,14 @@ export function MessagesPanel({
                   >
                     {c.visibility === "organiser" ? "🔒 Private" : "Everyone"}
                   </span>
+                  {c.handedOver && (
+                    <span
+                      className="chip chip-coral !py-0 !text-[0.6rem]"
+                      title="You handed this name to someone else. They can't see this person's private messages."
+                    >
+                      Earlier claimer
+                    </span>
+                  )}
                   <span className="font-mono text-[0.65rem] font-bold text-faint">
                     {new Date(c.createdAt).toLocaleString("en-GB", {
                       day: "numeric",

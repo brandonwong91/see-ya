@@ -80,6 +80,10 @@ export interface Comment {
   /** `organiser` messages are only seen by the organiser and their author. */
   visibility: CommentVisibility;
   createdAt: string;
+  /** Set when the organiser handed the author's name to someone else. The
+   *  earlier claimer loses access, so their private messages stay with the
+   *  organiser only; `email` is theirs, kept so the organiser can still reply. */
+  handedOver?: { at: string; email: string };
 }
 
 /** A comment as a guest sees it. */

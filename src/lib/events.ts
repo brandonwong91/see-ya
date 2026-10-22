@@ -420,6 +420,7 @@ export function resolveClaimRequest(
 
   request.status = "approved";
   const previousId = invitee.id;
+  const previousEmail = invitee.email;
   invitee.id = newSubId();
   invitee.claimedAt = now;
   if (!event.invitees.some((i) => i !== invitee && i.email === request.email)) {
@@ -434,6 +435,14 @@ export function resolveClaimRequest(
   }
   for (const other of event.claimRequests ?? []) {
     if (other.inviteeId === previousId) other.inviteeId = invitee.id;
+  }
+  // Messages stay with whoever wrote them, not the name: they keep the old id,
+  // so the new holder can't read the earlier claimer's private messages, and
+  // the earlier claimer (signed out) can't either — only the organiser can.
+  for (const comment of event.comments ?? []) {
+    if (comment.authorId === previousId) {
+      comment.handedOver ??= { at: now, email: previousEmail };
+    }
   }
   event.changeLog.push({
     at: now,
@@ -488,7 +497,8 @@ export function visibleComments(
   return (event.comments ?? [])
     .filter(
       (c) =>
-        c.visibility === "public" || (viewerId && c.authorId === viewerId),
+        c.visibility === "public" ||
+        (viewerId && c.authorId === viewerId && !c.handedOver),
     )
     .map((c) => ({
       id: c.id,
