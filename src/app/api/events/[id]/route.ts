@@ -1,12 +1,17 @@
 import {
   applyPatch,
+  deleteEvent,
   getEvent,
   notifyRecipients,
   saveEvent,
   toManageEvent,
   toPublicEvent,
 } from "@/lib/events";
-import { sendEventUpdated } from "@/lib/email";
+import {
+  sendEventCancelled,
+  sendEventDeletedToOrganiser,
+  sendEventUpdated,
+} from "@/lib/email";
 import { patchEventSchema } from "@/lib/validation";
 import { fail, handleError, ok, parseBody } from "@/lib/http";
 
@@ -94,6 +99,43 @@ export async function PATCH(req: Request, { params }: Ctx) {
     }
 
     return ok({ event: toManageEvent(updated), changes, notified });
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+export async function DELETE(req: Request, { params }: Ctx) {
+  try {
+    const { id } = await params;
+    const event = await getEvent(id);
+    if (!event) return fail("Event not found", 404);
+
+    const token = new URL(req.url).searchParams.get("token");
+    if (!token || token !== event.editToken) {
+      return fail("Not authorised to delete this event", 403);
+    }
+
+    // { notifyGuests: false } skips the cancellation emails; default is on.
+    const body = await req.json().catch(() => ({}));
+    const notifyGuests = body?.notifyGuests !== false;
+
+    // Delete first, so a failed delete never sends a "deleted" email.
+    await deleteEvent(event.id);
+
+    let notified = 0;
+    if (notifyGuests) {
+      await Promise.allSettled(
+        notifyRecipients(event).map(async (r) => {
+          await sendEventCancelled(event, r);
+          notified += 1;
+        }),
+      );
+    }
+    await sendEventDeletedToOrganiser(event, notified).catch((err) =>
+      console.error("Deletion confirmation email failed:", err),
+    );
+
+    return ok({ deleted: true, notified });
   } catch (err) {
     return handleError(err);
   }

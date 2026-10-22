@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AvailabilityGrid } from "./AvailabilityGrid";
 import { ClaimRequests } from "./ClaimRequests";
+import { DeleteEventPanel } from "./DeleteEventPanel";
 import { EditEventPanel } from "./EditEventPanel";
 import { InvitePanel } from "./InvitePanel";
 import { MessagesPanel } from "./MessagesPanel";
@@ -26,6 +28,7 @@ export function ManageDashboard({
   const [pendingFinalise, setPendingFinalise] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [deleted, setDeleted] = useState<{ notified: number } | null>(null);
 
   const shareUrl = `${origin}/event/${event.id}`;
   const manageUrl = `${origin}/event/${event.id}/manage?token=${token}`;
@@ -92,6 +95,31 @@ export function ManageDashboard({
     } catch (err) {
       setFlash(err instanceof Error ? err.message : "Could not re-open");
     }
+  }
+
+  if (deleted) {
+    return (
+      <div className="card flash-in max-w-lg p-8">
+        <span className="chip chip-mint">Deleted 🗑️</span>
+        <h1 className="mt-4 text-[clamp(1.8rem,4vw,2.75rem)]">
+          &ldquo;{event.title}&rdquo; is gone.
+        </h1>
+        <p className="mt-3 font-medium text-ink-soft">
+          We&rsquo;ve emailed you a confirmation
+          {deleted.notified > 0 &&
+            ` and let ${deleted.notified} ${deleted.notified === 1 ? "guest" : "guests"} know it's cancelled`}
+          . The share link and this dashboard no longer work.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/create" className="btn btn-accent">
+            Start a new plan
+          </Link>
+          <Link href="/" className="btn btn-ghost">
+            Back home
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -315,6 +343,15 @@ export function ManageDashboard({
           )}
         </div>
       </section>
+
+      <DeleteEventPanel
+        event={event}
+        token={token}
+        onDeleted={(notified) => {
+          setDeleted({ notified });
+          window.scrollTo({ top: 0 });
+        }}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { getBasket, putBasket, PantryError } from "./pantry";
+import { deleteBasket, getBasket, putBasket, PantryError } from "./pantry";
 import { cache } from "react";
 import { newEditToken, newEventId, newSubId } from "./ids";
 import { formatDateLong, formatDateShort, formatTime } from "./format";
@@ -60,6 +60,10 @@ export const loadEvent = cache(async (id: string): Promise<{
 export async function saveEvent(event: EventRecord): Promise<void> {
   event.updatedAt = new Date().toISOString();
   await putBasket(basketName(event.id), event);
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  await deleteBasket(basketName(id));
 }
 
 export async function createEvent(
